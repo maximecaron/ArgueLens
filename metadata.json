@@ -1,0 +1,5 @@
+{
+  "name": "ArgueLens",
+  "description": "An analytical reading tool that uses AI to deconstruct argumentative texts into claims, evidence, and reasoning with interactive annotations.",
+  "requestFramePermissions": []
+}
