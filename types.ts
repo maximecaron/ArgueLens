@@ -33,6 +33,7 @@ export interface Annotation {
   supported_claim_ids?: string[];
   supported_evidence_ids?: string[];
   is_logically_valid?: boolean;
+  invalid_logic_explanation?: string;
   bias_indicators?: BiasIndicator[];
   logical_fallacies?: LogicalFallacy[];
 }

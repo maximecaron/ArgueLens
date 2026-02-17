@@ -17,19 +17,20 @@ export const analyzeText = async (text: string): Promise<AnalysisResult> => {
     1. Assign a unique "id" to every annotation (e.g., "c1", "e1", "r1", "ca1").
     2. Extract the "quote" exactly as it appears in the text.
     3. Categorize by "type": Claim, Evidence, Reasoning, or Counterargument.
-    4. Provide a 1-sentence "explanation".
+    4. Provide a 1-sentence "explanation" of what this part represents.
     
     For EVIDENCE annotations, also include:
     - "evidence_type": One of "fact", "statistic", "example", "expert_testimony", "anecdote", "other".
     - "source_credibility": "high", "medium", "low", "unknown".
 
-    For REASONING, EVIDENCE, and COUNTERARGUMENT annotations, also include:
+    For REASONING, EVIDENCE, and COUNTERARGUMENT annotations, you MUST include:
     - "supported_claim_ids": A list of Claim IDs that this segment supports.
     - "supported_evidence_ids": A list of Evidence IDs that this segment relies on or supports.
     - "is_logically_valid": true or false.
-    - "bias_indicators": A list of potential biases (id, type, text, severity).
+    - "invalid_logic_explanation": If "is_logically_valid" is false, provide a clear explanation of why the logic is flawed. If valid, leave empty.
+    - "bias_indicators": A list of potential biases (id, type, text, severity). ALWAYS return this list (empty if none found).
       Bias types: "emotionally_charged_language", "one_sidedness", "omission", "cherry_picking", "lack_of_sources", "other".
-    - "logical_fallacies": A list of logical fallacies (id, fallacy_type, text, severity).
+    - "logical_fallacies": A list of logical fallacies (id, fallacy_type, text, severity). ALWAYS return this list (empty if none found).
       Fallacy types: "ad_hominem", "straw_man", "slippery_slope", "red_herring", "false_cause", "overgeneralization", "other".
 
     Text to analyze:
@@ -83,6 +84,7 @@ export const analyzeText = async (text: string): Promise<AnalysisResult> => {
                     items: { type: Type.STRING }
                   },
                   is_logically_valid: { type: Type.BOOLEAN },
+                  invalid_logic_explanation: { type: Type.STRING },
                   
                   bias_indicators: {
                     type: Type.ARRAY,

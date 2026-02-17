@@ -1,17 +1,65 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { Annotation, TextSegment, AnnotationType } from '../types';
 import { TYPE_COLORS } from '../constants';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Info, Quote, Scale, FileText, AlertTriangle, CheckCircle, XCircle, ShieldAlert } from 'lucide-react';
+import { Info, Quote, Scale, FileText, AlertTriangle, CheckCircle, XCircle, ShieldAlert, ChevronDown, ChevronRight, AlertOctagon } from 'lucide-react';
 
 interface TextHighlighterProps {
   text: string;
   annotations: Annotation[];
 }
 
+// Accordion Component
+const Accordion = ({ 
+  title, 
+  children, 
+  icon,
+  defaultOpen = true,
+  count
+}: { 
+  title: React.ReactNode, 
+  children?: React.ReactNode, 
+  icon?: React.ReactNode,
+  defaultOpen?: boolean,
+  count?: number
+}) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  if (count === 0) return null;
+
+  return (
+    <div className="mb-2 border border-slate-200 rounded-md overflow-hidden bg-white shadow-sm">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+      >
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+           {icon}
+           <span>{title}</span>
+           {count !== undefined && (
+             <span className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full text-[10px] min-w-[1.25rem] text-center">
+               {count}
+             </span>
+           )}
+        </div>
+        {isOpen ? <ChevronDown className="w-3 h-3 text-slate-400" /> : <ChevronRight className="w-3 h-3 text-slate-400" />}
+      </button>
+      {isOpen && (
+        <div className="p-2 border-t border-slate-100 text-xs">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const TextHighlighter: React.FC<TextHighlighterProps> = ({ text, annotations }) => {
   const [hoveredAnnotation, setHoveredAnnotation] = useState<Annotation | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const segments: TextSegment[] = useMemo(() => {
     if (!annotations || annotations.length === 0) {
@@ -76,10 +124,13 @@ const TextHighlighter: React.FC<TextHighlighterProps> = ({ text, annotations }) 
   }, [text, annotations]);
 
   const handleMouseEnter = (e: React.MouseEvent, annotation: Annotation) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
     setHoveredAnnotation(annotation);
-    // Calculate position
+    
     const rect = e.currentTarget.getBoundingClientRect();
-    // Default to center top, but we'll adjust in CSS if needed
     setMousePos({
       x: rect.left + rect.width / 2,
       y: rect.top,
@@ -87,7 +138,22 @@ const TextHighlighter: React.FC<TextHighlighterProps> = ({ text, annotations }) 
   };
 
   const handleMouseLeave = () => {
-    setHoveredAnnotation(null);
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredAnnotation(null);
+    }, 300);
+  };
+
+  const handleTooltipEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+  };
+
+  const handleTooltipLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredAnnotation(null);
+    }, 300);
   };
 
   const getIcon = (type: string) => {
@@ -103,17 +169,17 @@ const TextHighlighter: React.FC<TextHighlighterProps> = ({ text, annotations }) 
   const renderTable = (headers: string[], rows: (string | React.ReactNode)[][]) => {
     if (rows.length === 0) return null;
     return (
-      <div className="overflow-x-auto my-2 border border-slate-200 rounded">
+      <div className="overflow-x-auto my-1 border border-slate-200 rounded">
         <table className="min-w-full text-xs text-left">
-          <thead className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
+          <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
             <tr>
-              {headers.map((h, i) => <th key={i} className="px-2 py-1">{h}</th>)}
+              {headers.map((h, i) => <th key={i} className="px-2 py-1 whitespace-nowrap">{h}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows.map((row, i) => (
               <tr key={i}>
-                {row.map((cell, j) => <td key={j} className="px-2 py-1 text-slate-700 whitespace-pre-wrap">{cell}</td>)}
+                {row.map((cell, j) => <td key={j} className="px-2 py-1 text-slate-700 whitespace-pre-wrap align-top">{cell}</td>)}
               </tr>
             ))}
           </tbody>
@@ -159,11 +225,16 @@ const TextHighlighter: React.FC<TextHighlighterProps> = ({ text, annotations }) 
               transform: 'translate(-50%, -100%)',
               zIndex: 50,
             }}
-            className="pointer-events-none w-96 max-w-[90vw]"
+            className="w-96 max-w-[90vw] pointer-events-auto"
+            onMouseEnter={handleTooltipEnter}
+            onMouseLeave={handleTooltipLeave}
           >
-            <div className={`shadow-2xl rounded-lg bg-white border border-slate-200 relative overflow-hidden`}>
+            <div 
+              className={`shadow-2xl rounded-lg bg-white border border-slate-200 relative overflow-hidden flex flex-col`}
+              key={hoveredAnnotation.id}
+            >
               {/* Header */}
-              <div className={`px-4 py-2 border-b border-slate-100 flex items-center justify-between ${TYPE_COLORS[hoveredAnnotation.type].bg}`}>
+              <div className={`px-4 py-3 border-b border-slate-100 flex items-center justify-between ${TYPE_COLORS[hoveredAnnotation.type].bg}`}>
                 <div className={`flex items-center text-xs font-bold uppercase tracking-wider ${TYPE_COLORS[hoveredAnnotation.type].text}`}>
                   {getIcon(hoveredAnnotation.type)}
                   {TYPE_COLORS[hoveredAnnotation.type].label} <span className="ml-2 opacity-60">#{hoveredAnnotation.id}</span>
@@ -178,20 +249,20 @@ const TextHighlighter: React.FC<TextHighlighterProps> = ({ text, annotations }) 
 
               <div className="p-4 max-h-[60vh] overflow-y-auto">
                 {/* Explanation */}
-                <p className="text-sm text-slate-700 mb-3 italic">
+                <p className="text-sm text-slate-700 mb-4 italic leading-relaxed">
                   {hoveredAnnotation.explanation}
                 </p>
 
                 {/* Evidence Details */}
                 {hoveredAnnotation.type === AnnotationType.EVIDENCE && (
-                  <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
-                    <div className="bg-slate-50 p-2 rounded border border-slate-100">
-                      <span className="block text-slate-400 font-semibold mb-1">Type</span>
-                      <span className="capitalize text-slate-800">{hoveredAnnotation.evidence_type || 'N/A'}</span>
+                  <div className="grid grid-cols-2 gap-3 mb-4 text-xs">
+                    <div className="bg-slate-50 p-2.5 rounded border border-slate-100">
+                      <span className="block text-slate-400 font-semibold mb-1 uppercase tracking-wider text-[10px]">Type</span>
+                      <span className="capitalize text-slate-800 font-medium">{hoveredAnnotation.evidence_type?.replace(/_/g, ' ') || 'N/A'}</span>
                     </div>
-                    <div className="bg-slate-50 p-2 rounded border border-slate-100">
-                      <span className="block text-slate-400 font-semibold mb-1">Credibility</span>
-                      <span className={`capitalize font-medium ${
+                    <div className="bg-slate-50 p-2.5 rounded border border-slate-100">
+                      <span className="block text-slate-400 font-semibold mb-1 uppercase tracking-wider text-[10px]">Credibility</span>
+                      <span className={`capitalize font-bold ${
                         hoveredAnnotation.source_credibility === 'high' ? 'text-green-600' :
                         hoveredAnnotation.source_credibility === 'medium' ? 'text-yellow-600' :
                         hoveredAnnotation.source_credibility === 'low' ? 'text-red-600' : 'text-slate-600'
@@ -202,57 +273,83 @@ const TextHighlighter: React.FC<TextHighlighterProps> = ({ text, annotations }) 
                   </div>
                 )}
 
-                {/* Supported Claims Table */}
-                {hoveredAnnotation.supported_claim_ids && hoveredAnnotation.supported_claim_ids.length > 0 && (
-                  <div className="mb-3">
-                    <div className="text-xs font-bold text-slate-500 mb-1">Supported Claims</div>
-                    {renderTable(['Claim ID'], hoveredAnnotation.supported_claim_ids.map(id => [id]))}
-                  </div>
-                )}
-
-                {/* Supported Evidence Table */}
-                {hoveredAnnotation.supported_evidence_ids && hoveredAnnotation.supported_evidence_ids.length > 0 && (
-                  <div className="mb-3">
-                    <div className="text-xs font-bold text-slate-500 mb-1">Supported Evidence</div>
-                    {renderTable(['Evidence ID'], hoveredAnnotation.supported_evidence_ids.map(id => [id]))}
-                  </div>
-                )}
-
-                {/* Bias Indicators Table */}
-                {hoveredAnnotation.bias_indicators && hoveredAnnotation.bias_indicators.length > 0 && (
-                  <div className="mb-3">
-                    <div className="flex items-center text-xs font-bold text-amber-600 mb-1">
-                      <AlertTriangle className="w-3 h-3 mr-1" /> Bias Indicators
+                {/* Invalid Logic Explanation */}
+                {hoveredAnnotation.is_logically_valid === false && hoveredAnnotation.invalid_logic_explanation && (
+                  <div className="mb-4 bg-red-50 p-3 rounded-md border border-red-200 text-xs">
+                    <div className="flex items-center font-bold text-red-800 mb-1">
+                      <AlertOctagon className="w-3.5 h-3.5 mr-1.5" />
+                      Logic Flaw Detected
                     </div>
-                    {renderTable(
-                      ['ID', 'Type', 'Indicator', 'Sev'],
-                      hoveredAnnotation.bias_indicators.map(b => [
-                        b.id,
-                        b.type.replace(/_/g, ' '),
-                        b.text,
-                        <span className={`${b.severity === 'high' ? 'text-red-600 font-bold' : ''}`}>{b.severity}</span>
-                      ])
-                    )}
+                    <p className="text-red-700 leading-relaxed">
+                      {hoveredAnnotation.invalid_logic_explanation}
+                    </p>
                   </div>
                 )}
 
-                {/* Logical Fallacies Table */}
-                {hoveredAnnotation.logical_fallacies && hoveredAnnotation.logical_fallacies.length > 0 && (
-                  <div className="mb-3">
-                    <div className="flex items-center text-xs font-bold text-red-600 mb-1">
-                      <ShieldAlert className="w-3 h-3 mr-1" /> Logical Fallacies
-                    </div>
-                    {renderTable(
-                      ['ID', 'Type', 'Fallacy', 'Sev'],
-                      hoveredAnnotation.logical_fallacies.map(f => [
-                        f.id,
-                        f.fallacy_type.replace(/_/g, ' '),
-                        f.text,
-                        <span className={`${f.severity === 'high' ? 'text-red-600 font-bold' : ''}`}>{f.severity}</span>
-                      ])
-                    )}
-                  </div>
-                )}
+                {/* Accordions */}
+                <div className="space-y-1">
+                  
+                  {/* Supported Claims */}
+                  {hoveredAnnotation.supported_claim_ids && hoveredAnnotation.supported_claim_ids.length > 0 && (
+                    <Accordion 
+                      title="Supported Claims" 
+                      count={hoveredAnnotation.supported_claim_ids.length}
+                      icon={<Scale className="w-3.5 h-3.5 text-blue-500" />}
+                    >
+                       {renderTable(['Claim ID'], hoveredAnnotation.supported_claim_ids.map(id => [id]))}
+                    </Accordion>
+                  )}
+
+                  {/* Supported Evidence */}
+                  {hoveredAnnotation.supported_evidence_ids && hoveredAnnotation.supported_evidence_ids.length > 0 && (
+                    <Accordion 
+                      title="Supported Evidence"
+                      count={hoveredAnnotation.supported_evidence_ids.length}
+                      icon={<FileText className="w-3.5 h-3.5 text-emerald-500" />}
+                    >
+                      {renderTable(['Evidence ID'], hoveredAnnotation.supported_evidence_ids.map(id => [id]))}
+                    </Accordion>
+                  )}
+
+                  {/* Bias Indicators */}
+                  {hoveredAnnotation.bias_indicators && hoveredAnnotation.bias_indicators.length > 0 && (
+                     <Accordion 
+                       title="Bias Indicators"
+                       count={hoveredAnnotation.bias_indicators.length}
+                       icon={<AlertTriangle className="w-3.5 h-3.5 text-amber-500" />}
+                     >
+                        {renderTable(
+                          ['ID', 'Type', 'Indicator', 'Sev'],
+                          hoveredAnnotation.bias_indicators.map(b => [
+                            b.id,
+                            b.type.replace(/_/g, ' '),
+                            b.text,
+                            <span key="sev" className={`${b.severity === 'high' ? 'text-red-600 font-bold' : 'text-slate-600'}`}>{b.severity}</span>
+                          ])
+                        )}
+                     </Accordion>
+                  )}
+
+                  {/* Logical Fallacies */}
+                  {hoveredAnnotation.logical_fallacies && hoveredAnnotation.logical_fallacies.length > 0 && (
+                    <Accordion 
+                      title="Logical Fallacies"
+                      count={hoveredAnnotation.logical_fallacies.length}
+                      icon={<ShieldAlert className="w-3.5 h-3.5 text-red-500" />}
+                    >
+                       {renderTable(
+                          ['ID', 'Type', 'Fallacy', 'Sev'],
+                          hoveredAnnotation.logical_fallacies.map(f => [
+                            f.id,
+                            f.fallacy_type.replace(/_/g, ' '),
+                            f.text,
+                            <span key="sev" className={`${f.severity === 'high' ? 'text-red-600 font-bold' : 'text-slate-600'}`}>{f.severity}</span>
+                          ])
+                        )}
+                    </Accordion>
+                  )}
+                </div>
+
               </div>
               
               {/* Arrow */}
